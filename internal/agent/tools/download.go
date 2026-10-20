@@ -50,6 +50,7 @@ func downloadDescription() string {
 	})
 }
 
+/*利用http.Client下载文件到本地路径*/
 func NewDownloadTool(permissions permission.Service, workingDir string, client *http.Client) fantasy.AgentTool {
 	if client == nil {
 		transport := http.DefaultTransport.(*http.Transport).Clone()

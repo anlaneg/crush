@@ -29,6 +29,7 @@ var mu sync.Mutex
 
 // projectsFilePath returns the path to the projects.json file.
 func projectsFilePath() string {
+	/*返回projects.json文件的路径*/
 	return filepath.Join(filepath.Dir(config.GlobalConfigData()), projectsFileName)
 }
 
@@ -41,6 +42,7 @@ func Load() (*ProjectList, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			/*配置文件不存在，返回空列表*/
 			return &ProjectList{Projects: []Project{}}, nil
 		}
 		return nil, err
@@ -59,6 +61,7 @@ func Save(list *ProjectList) error {
 	mu.Lock()
 	defer mu.Unlock()
 
+	/*写projects.json文件*/
 	path := projectsFilePath()
 
 	// Ensure directory exists
@@ -76,6 +79,7 @@ func Save(list *ProjectList) error {
 
 // Register adds or updates a project in the list.
 func Register(workingDir, dataDir string) error {
+	/*取projects列表*/
 	list, err := Load()
 	if err != nil {
 		return err

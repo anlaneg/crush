@@ -167,6 +167,7 @@ type coordinator struct {
 	agentMu       sync.RWMutex
 	mainAgent     SessionAgent
 	mainAgentName string
+	/*按名称索引agent实例*/
 	agents        map[string]SessionAgent
 
 	// Skills discovery results (session-start snapshot).
@@ -202,6 +203,7 @@ func NewCoordinator(ctx context.Context, opts CoordinatorOptions) (Coordinator, 
 	// discovery so the coordinator still works.
 	var allSkills, activeSkills []*skills.Skill
 	if opts.Skills != nil {
+		/*从manager中获取所有skill列表及未被禁用的skill列表*/
 		allSkills = opts.Skills.AllSkills()
 		activeSkills = opts.Skills.ActiveSkills()
 	} else {
@@ -237,6 +239,7 @@ func NewCoordinator(ctx context.Context, opts CoordinatorOptions) (Coordinator, 
 		return nil, err
 	}
 
+	/*创建coder agent*/
 	agent, err := c.buildAgent(ctx, coderPrompt, agentCfg, false)
 	if err != nil {
 		return nil, err
@@ -308,6 +311,7 @@ func (c *coordinator) RunAccepted(ctx context.Context, accept *AcceptedRun, sess
 // dispatchMu; when nil (the in-process/local path) no accept tracking
 // applies.
 func (c *coordinator) run(ctx context.Context, accept *AcceptedRun, sessionID string, prompt string, attachments ...message.Attachment) (*fantasy.AgentResult, error) {
+	/*等待协程完成*/
 	if err := c.readyWg.Wait(); err != nil {
 		return nil, err
 	}
@@ -845,6 +849,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	return result, nil
 }
 
+/*根据配置构建支持的工具列表*/
 func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
 	var allTools []fantasy.AgentTool
 	if slices.Contains(agent.AllowedTools, AgentToolName) {
@@ -881,11 +886,13 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 
 	allTools = append(
 		allTools,
+		/*添加bash工具*/
 		tools.NewBashTool(c.permissions, c.cfg.WorkingDir(), c.cfg.Config().Options.DataDirectory, c.cfg.Config().Options.Attribution, modelID, c.cfg.Config().Options.GetMaxBackgroundJobs()),
 		tools.NewCrushInfoTool(c.cfg, c.lspManager, c.allSkills, c.activeSkills, c.skillTracker),
 		tools.NewCrushLogsTool(logFile),
 		tools.NewJobOutputTool(c.cfg.Config().Options.DataDirectory),
 		tools.NewJobKillTool(),
+		/*添加http下载工具*/
 		tools.NewDownloadTool(c.permissions, c.cfg.WorkingDir(), nil),
 		tools.NewEditTool(c.lspManager, c.permissions, c.history, c.filetracker, c.cfg.WorkingDir()),
 		tools.NewMultiEditTool(c.lspManager, c.permissions, c.history, c.filetracker, c.cfg.WorkingDir()),
@@ -896,11 +903,13 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 		tools.NewSourcegraphTool(nil),
 		tools.NewTodosTool(c.sessions),
 		tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, c.skillTracker, c.cfg.WorkingDir(), c.cfg.Config().Options.SkillsPaths...),
+		/*添加文件写入工具*/
 		tools.NewWriteTool(c.lspManager, c.permissions, c.history, c.filetracker, c.cfg.WorkingDir()),
 	)
 
 	// Question tool is interactive-only and not available to sub-agents.
 	if !isSubAgent && c.interactive {
+		/*添加向用户提问工具*/
 		allTools = append(allTools, tools.NewQuestionTool(c.questions))
 	}
 
@@ -922,7 +931,9 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 	if len(c.cfg.Config().MCP) > 0 {
 		allTools = append(
 			allTools,
+			/*添加MCP资源列表显示工具*/
 			tools.NewListMCPResourcesTool(c.cfg, c.permissions),
+			/*添加MCP资源读取工具*/
 			tools.NewReadMCPResourceTool(c.cfg, c.permissions),
 		)
 	}
@@ -930,6 +941,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 	var filteredTools []fantasy.AgentTool
 	for _, tool := range allTools {
 		if slices.Contains(agent.AllowedTools, tool.Info().Name) {
+			/*只有容许的tools才能被添加到过滤列表中*/
 			filteredTools = append(filteredTools, tool)
 		}
 	}
@@ -968,7 +980,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent, isSubA
 	// itself is still wrapped from the coder's side.
 	filteredTools = wrapToolsWithHooks(filteredTools, hookRunner, isSubAgent)
 
-	return filteredTools, nil
+	return filteredTools /*返回工具列表*/, nil
 }
 
 // TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config
@@ -982,6 +994,7 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 		return Model{}, Model{}, errSmallModelNotSelected
 	}
 
+	/*取large model的provider配置*/
 	largeProviderCfg, ok := c.cfg.Config().Providers.Get(largeModelCfg.Provider)
 	if !ok {
 		return Model{}, Model{}, errLargeModelProviderNotConfigured
@@ -992,6 +1005,7 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 		return Model{}, Model{}, err
 	}
 
+	/*取small model的provider配置*/
 	smallProviderCfg, ok := c.cfg.Config().Providers.Get(smallModelCfg.Provider)
 	if !ok {
 		return Model{}, Model{}, errSmallModelProviderNotConfigured
@@ -1275,6 +1289,7 @@ func (c *coordinator) buildBedrockProvider(apiKey string, headers map[string]str
 	return bedrock.New(opts...)
 }
 
+/*根据Google provider配置构建Google provider实例*/
 func (c *coordinator) buildGoogleProvider(baseURL, apiKey string, headers map[string]string) (fantasy.Provider, error) {
 	opts := []google.Option{
 		google.WithBaseURL(baseURL),
@@ -1282,9 +1297,11 @@ func (c *coordinator) buildGoogleProvider(baseURL, apiKey string, headers map[st
 	}
 	if c.cfg.Config().Options.Debug {
 		httpClient := log.NewHTTPClient()
+		/*设置HTTP client*/
 		opts = append(opts, google.WithHTTPClient(httpClient))
 	}
 	if len(headers) > 0 {
+		/*设置headers*/
 		opts = append(opts, google.WithHeaders(headers))
 	}
 	return google.New(opts...)
@@ -1316,6 +1333,7 @@ func (c *coordinator) isAnthropicThinking(model config.SelectedModel) bool {
 	return err == nil && opts.Thinking != nil
 }
 
+/*根据provider配置构建provider实例*/
 func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model config.SelectedModel, isSubAgent bool) (fantasy.Provider, error) {
 	headers := maps.Clone(providerCfg.ExtraHeaders)
 	if headers == nil {
@@ -1367,6 +1385,7 @@ func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model con
 	case bedrock.Name:
 		return c.buildBedrockProvider(apiKey, headers, providerCfg.ID)
 	case google.Name:
+		/*根据Google provider配置构建Google provider实例*/
 		return c.buildGoogleProvider(baseURL, apiKey, headers)
 	case "google-vertex":
 		return c.buildGoogleVertexProvider(headers, providerCfg.ExtraParams)
@@ -1467,6 +1486,7 @@ func (c *coordinator) updateAgentModels(ctx context.Context, agent SessionAgent,
 		return fmt.Errorf("%w: %s", errMainAgentNotFound, name)
 	}
 
+	/*构造支持的tools列表*/
 	tools, err := c.buildTools(ctx, agentCfg, false)
 	if err != nil {
 		return err

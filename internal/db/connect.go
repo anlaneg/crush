@@ -90,6 +90,7 @@ func Connect(ctx context.Context, dataDir string, opts ...ConnectOption) (*sql.D
 		opt(&cfg)
 	}
 
+	/*设置数据库路径*/
 	dbPath := filepath.Join(dataDir, "crush.db")
 
 	// Resolve to an absolute path so that different relative paths to
@@ -103,6 +104,7 @@ func Connect(ctx context.Context, dataDir string, opts ...ConnectOption) (*sql.D
 	defer poolMu.Unlock()
 
 	if entry, ok := pool[absPath]; ok {
+		/*数据库连接已存在，增加引用计数，并返回*/
 		entry.refCount++
 		return entry.db, nil
 	}

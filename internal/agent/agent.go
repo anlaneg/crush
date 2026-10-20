@@ -276,6 +276,7 @@ type SessionAgentOptions struct {
 	RunComplete          pubsub.Publisher[notify.RunComplete]
 }
 
+/*创建session agent*/
 func NewSessionAgent(
 	opts SessionAgentOptions,
 ) SessionAgent {
@@ -1785,6 +1786,7 @@ func (a *sessionAgent) GenerateTitle(ctx context.Context, sessionID string, user
 	}
 
 	streamCall := fantasy.AgentStreamCall{
+		/*提示词指明生成标题*/
 		Prompt:  fmt.Sprintf("Generate a concise title for the following content:\n\n%s\n <think>\n\n</think>", userPrompt),
 		Headers: sessionHeaders(sessionID),
 		PrepareStep: func(callCtx context.Context, opts fantasy.PrepareStepFunctionOptions) (_ context.Context, prepared fantasy.PrepareStepResult, err error) {

@@ -842,13 +842,13 @@ func (app *App) subscribeMustDeliver[T any](
 }
 
 func (app *App) InitCoderAgent(ctx context.Context) error {
-	return app.initCoderAgent(ctx, true)
+	return app.initCoderAgent(ctx, true /*交互模式*/)
 }
 
 // InitCoderAgentNonInteractive initializes the coder agent without
 // interactive-only tools (e.g. question).
 func (app *App) InitCoderAgentNonInteractive(ctx context.Context) error {
-	return app.initCoderAgent(ctx, false)
+	return app.initCoderAgent(ctx, false /*非交互模式*/)
 }
 
 func (app *App) initCoderAgent(ctx context.Context, interactive bool) error {

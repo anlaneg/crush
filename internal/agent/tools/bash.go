@@ -149,9 +149,10 @@ var bannedCommands = []string{
 func bashDescription(attribution *config.Attribution, modelID string) string {
 	bannedCommandsStr := strings.Join(bannedCommands, ", ")
 	var out bytes.Buffer
+	/*生成最终文本*/
 	if err := bashDescriptionTpl.Execute(&out, bashDescriptionData{
-		BannedCommands:  bannedCommandsStr,
-		MaxOutputLength: MaxOutputLength,
+		BannedCommands:  bannedCommandsStr, /*禁用的命令*/
+		MaxOutputLength: MaxOutputLength,   /*最大输出长度*/
 		Attribution:     *attribution,
 		ModelID:         modelID,
 		RgAvailable:     getRg() != "",
@@ -197,14 +198,15 @@ func blockFuncs() []shell.BlockFunc {
 
 func NewBashTool(permissions permission.Service, workingDir, spillDir string, attribution *config.Attribution, modelID string, maxBackgroundJobs int) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
-		BashToolName,
-		string(bashDescription(attribution, modelID)),
+		BashToolName, /*工具名称*/
+		string(bashDescription(attribution, modelID)), /*工具描述*/
 		func(ctx context.Context, params BashParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Command == "" {
 				return fantasy.NewTextErrorResponse("missing command"), nil
 			}
 
 			// Determine working directory
+			/*确定工作目录*/
 			execWorkingDir := cmp.Or(params.WorkingDir, workingDir)
 
 			isSafeReadOnly := false
@@ -214,6 +216,7 @@ func NewBashTool(permissions permission.Service, workingDir, spillDir string, at
 				for _, safe := range safeCommands {
 					if strings.HasPrefix(cmdLower, safe) {
 						if len(cmdLower) == len(safe) || cmdLower[len(safe)] == ' ' || cmdLower[len(safe)] == '-' {
+							/*只读的安全命令*/
 							isSafeReadOnly = true
 							break
 						}
@@ -226,6 +229,7 @@ func NewBashTool(permissions permission.Service, workingDir, spillDir string, at
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for executing shell command")
 			}
 			if !isSafeReadOnly {
+				/*请求批准执行权限*/
 				p, err := permissions.Request(
 					ctx,
 					permission.CreatePermissionRequest{
@@ -242,12 +246,14 @@ func NewBashTool(permissions permission.Service, workingDir, spillDir string, at
 					return fantasy.ToolResponse{}, err
 				}
 				if !p {
+					/*用户拒绝权限*/
 					return NewPermissionDeniedResponse(), nil
 				}
 			}
 
 			// If explicitly requested as background, start immediately with detached context
 			if params.RunInBackground {
+				/*如果明确请求在后台运行*/
 				startTime := time.Now()
 				bgManager := shell.GetBackgroundShellManager()
 				// Use background context so it continues after tool returns
@@ -305,6 +311,7 @@ func NewBashTool(permissions permission.Service, workingDir, spillDir string, at
 
 			// Start with detached context so it can survive if moved to background
 			bgManager := shell.GetBackgroundShellManager()
+			/*启动shell，执行command*/
 			bgShell, err := bgManager.Start(context.Background(), execWorkingDir, blockFuncs(), params.Command, params.Description, maxBackgroundJobs)
 			if err != nil {
 				return fantasy.ToolResponse{}, fmt.Errorf("error starting shell: %w", err)

@@ -212,7 +212,7 @@ func Execute() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	err := fang.Execute(
 		ctx,
-		rootCmd,
+		rootCmd,/*根命令*/
 		fang.WithVersion(version.Version),
 		fang.WithErrorHandler(func(w io.Writer, styles fang.Styles, err error) {
 			if ctx.Err() == nil {
@@ -287,6 +287,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 	dataDir, _ := cmd.Flags().GetString("data-dir")
 	ctx := cmd.Context()
 
+	/*解析工作目录*/
 	cwd, err := ResolveCwd(cmd)
 	if err != nil {
 		return nil, nil, err
@@ -307,20 +308,24 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 
 	gitIgnorePath := filepath.Join(cfg.Options.DataDirectory, ".gitignore")
 	if _, err := os.Stat(gitIgnorePath); os.IsNotExist(err) {
+		/*在data目录下创建.gitignore文件，用于忽略所有文件*/
 		if err := os.WriteFile(gitIgnorePath, []byte("*\n"), 0o644); err != nil {
 			return nil, nil, fmt.Errorf("failed to create .gitignore file: %q %w", gitIgnorePath, err)
 		}
 	}
 
+	/*注册project到projects.json文件*/
 	if err := projects.Register(cwd, cfg.Options.DataDirectory); err != nil {
 		slog.Warn("Failed to register project", "error", err)
 	}
 
+	/*连接数据库*/
 	conn, err := db.Connect(ctx, cfg.Options.DataDirectory)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	/*设置日志文件路径*/
 	logFile := filepath.Join(cfg.Options.DataDirectory, "logs", "crush.log")
 	crushlog.Setup(logFile, debug)
 
@@ -329,6 +334,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 	// globals (which the TUI reads via skills.GetLatestStates) in sync
 	// with the manager.
 	discoveryCfg := localSkillsDiscoveryConfig(store)
+	/*加载所有skill.md文件*/
 	allSkills, activeSkills, skillStates := skills.DiscoverFromConfig(discoveryCfg)
 	skillsMgr := skills.NewManager(
 		allSkills, activeSkills, skillStates,
@@ -982,12 +988,14 @@ func resolveWorkspaceSessionID(ctx context.Context, ws workspace.Workspace, id s
 func ResolveCwd(cmd *cobra.Command) (string, error) {
 	cwd, _ := cmd.Flags().GetString("cwd")
 	if cwd != "" {
+		/*切换到指定目录*/
 		err := os.Chdir(cwd)
 		if err != nil {
 			return "", fmt.Errorf("failed to change directory: %v", err)
 		}
 		return cwd, nil
 	}
+	/*获取当前工作目录*/
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)

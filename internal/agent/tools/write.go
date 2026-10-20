@@ -86,6 +86,7 @@ func NewWriteTool(
 				return fantasy.ToolResponse{}, fmt.Errorf("error checking file: %w", err)
 			}
 
+			/*读取旧内容*/
 			oldContent := ""
 			if fileInfo != nil && !fileInfo.IsDir() {
 				oldBytes, readErr := os.ReadFile(filePath)
@@ -94,12 +95,14 @@ func NewWriteTool(
 				}
 			}
 
+			/*针对新旧内容产生差异报告*/
 			diff, additions, removals := diff.GenerateDiff(
 				oldContent,
-				params.Content,
+				params.Content,/*新内容*/
 				strings.TrimPrefix(filePath, workingDir),
 			)
 
+			/*请求写入权限*/
 			p, err := permissions.Request(
 				ctx,
 				permission.CreatePermissionRequest{
@@ -129,6 +132,7 @@ func NewWriteTool(
 				return resp, nil
 			}
 
+			/*写入新内容*/
 			if err = writeFileWithParents(filePath, []byte(params.Content)); err != nil {
 				return fantasy.ToolResponse{}, err
 			}

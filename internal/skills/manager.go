@@ -90,6 +90,7 @@ func NewManager(allSkills, activeSkills []*Skill, states []*SkillState, opts ...
 func (m *Manager) AllSkills() []*Skill {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	/*返回所有skill列表*/
 	return m.allSkills
 }
 
@@ -98,6 +99,7 @@ func (m *Manager) AllSkills() []*Skill {
 func (m *Manager) ActiveSkills() []*Skill {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	/*返回所有未禁用的skill列表*/
 	return m.activeSkills
 }
 
@@ -171,18 +173,21 @@ func (m *Manager) Shutdown() {
 //   - activeSkills: post-filter (DisabledSkills removed).
 //   - states:       per-file discovery outcome for diagnostics/UI.
 func DiscoverFromConfig(cfg DiscoveryConfig) (allSkills, activeSkills []*Skill, states []*SkillState) {
+	/*加载内置skill*/
 	builtin, builtinStates := DiscoverBuiltinWithStates()
 	discovered := append([]*Skill(nil), builtin...)
 
 	var userStates []*SkillState
 	userPaths := cfg.ResolvePaths()
 	if len(userPaths) > 0 {
+		/*在userPaths中加载skill.md*/
 		var userSkills []*Skill
 		userSkills, userStates = DiscoverWithStates(userPaths)
 		discovered = append(discovered, userSkills...)
 	}
 
 	allSkills = Deduplicate(discovered)
+	/*移除掉禁用的skill*/
 	activeSkills = Filter(allSkills, cfg.DisabledSkills)
 
 	allStates := append([]*SkillState(nil), builtinStates...)
@@ -191,13 +196,14 @@ func DiscoverFromConfig(cfg DiscoveryConfig) (allSkills, activeSkills []*Skill, 
 	slices.SortStableFunc(allStates, func(a, b *SkillState) int {
 		return strings.Compare(strings.ToLower(a.Path), strings.ToLower(b.Path))
 	})
-	return allSkills, activeSkills, allStates
+	return allSkills /*所有skill列表*/, activeSkills /*未禁用的skill列表*/, allStates /*发现状态列表*/
 }
 
 // DiscoveryConfig contains the inputs DiscoverFromConfig needs. Using a
 // dedicated struct (rather than importing internal/config) keeps the
 // skills package's dependency graph small.
 type DiscoveryConfig struct {
+	/*用户指定的可用于加载skill.md的路径*/
 	SkillsPaths    []string
 	DisabledSkills []string
 	WorkingDir     string

@@ -43,10 +43,11 @@ type Skill struct {
 	License                string            `yaml:"license,omitempty" json:"license,omitempty"`
 	Compatibility          string            `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
 	Metadata               map[string]string `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Instructions           string            `yaml:"-" json:"instructions"`
-	Path                   string            `yaml:"-" json:"path"`
-	SkillFilePath          string            `yaml:"-" json:"skill_file_path"`
-	Builtin                bool              `yaml:"-" json:"builtin"`
+	/*skill指令部分*/
+	Instructions  string `yaml:"-" json:"instructions"`
+	Path          string `yaml:"-" json:"path"`
+	SkillFilePath string `yaml:"-" json:"skill_file_path"`
+	Builtin       bool   `yaml:"-" json:"builtin"`
 }
 
 // DiscoveryState represents the outcome of discovering a single skill file.
@@ -119,14 +120,18 @@ func (s *Skill) Validate() error {
 	var errs []error
 
 	if s.Name == "" {
+		/*name不能为空*/
 		errs = append(errs, errors.New("name is required"))
 	} else {
+		/*name长度不能超过MaxNameLength*/
 		if len(s.Name) > MaxNameLength {
 			errs = append(errs, fmt.Errorf("name exceeds %d characters", MaxNameLength))
 		}
+		/*name只能包含字母、数字和短横线*/
 		if !namePattern.MatchString(s.Name) {
 			errs = append(errs, errors.New("name must be alphanumeric with hyphens, no leading/trailing/consecutive hyphens"))
 		}
+		/*name必须与目录名匹配*/
 		if s.Path != "" && !strings.EqualFold(filepath.Base(s.Path), s.Name) {
 			errs = append(errs, fmt.Errorf("name %q must match directory %q", s.Name, filepath.Base(s.Path)))
 		}
@@ -147,6 +152,7 @@ func (s *Skill) Validate() error {
 
 // Parse parses a SKILL.md file from disk.
 func Parse(path string) (*Skill, error) {
+	/*读取skill.md文件内容*/
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -170,11 +176,13 @@ func ParseContent(content []byte) (*Skill, error) {
 		return nil, err
 	}
 
+	/*解析YAML frontmatter*/
 	var skill Skill
 	if err := yaml.Unmarshal([]byte(frontmatter), &skill); err != nil {
 		return nil, fmt.Errorf("parsing frontmatter: %w", err)
 	}
 
+	/*解析skill指令部分*/
 	skill.Instructions = strings.TrimSpace(body)
 
 	return &skill, nil
@@ -188,11 +196,13 @@ func splitFrontmatter(content string) (frontmatter, body string, err error) {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	content = strings.ReplaceAll(content, "\r", "\n")
 
+	/*按行分割内容*/
 	lines := strings.Split(content, "\n")
 	start := slices.IndexFunc(lines, func(line string) bool {
 		return strings.TrimSpace(line) != ""
 	})
 	if start == -1 || strings.TrimSpace(lines[start]) != "---" {
+		/*没有YAML frontmatter*/
 		return "", "", errors.New("no YAML frontmatter found")
 	}
 
@@ -200,10 +210,12 @@ func splitFrontmatter(content string) (frontmatter, body string, err error) {
 		return strings.TrimSpace(line) == "---"
 	})
 	if endOffset == -1 {
+		/*没有找到结尾---，YAML frontmatter不完整*/
 		return "", "", errors.New("unclosed frontmatter")
 	}
 	end := start + 1 + endOffset
 
+	/*skill.md共有两部分，YAML frontmatter和body，分开返回*/
 	frontmatter = strings.Join(lines[start+1:end], "\n")
 	body = strings.Join(lines[end+1:], "\n")
 	return frontmatter, body, nil
@@ -250,26 +262,31 @@ func DiscoverWithStates(paths []string) ([]*Skill, []*SkillState) {
 				return nil
 			}
 			if d.IsDir() || d.Name() != SkillFileName {
+				/*跳过非SKILL.md文件*/
 				return nil
 			}
 			mu.Lock()
 			if seen[path] {
+				/*跳过已处理的文件*/
 				mu.Unlock()
 				return nil
 			}
 			seen[path] = true
 			mu.Unlock()
+			/*解析skill.md文件*/
 			skill, err := Parse(path)
 			if err != nil {
 				slog.Warn("Failed to parse skill file", "path", path, "error", err)
 				addState("", path, StateError, err)
 				return nil
 			}
+			/*验证skill*/
 			if err := skill.Validate(); err != nil {
 				slog.Warn("Skill validation failed", "path", path, "error", err)
 				addState(skill.Name, path, StateError, err)
 				return nil
 			}
+			/*添加成功加载的skill到列表*/
 			slog.Debug("Successfully loaded skill", "name", skill.Name, "path", path)
 			mu.Lock()
 			skills = append(skills, skill)
@@ -289,7 +306,7 @@ func DiscoverWithStates(paths []string) ([]*Skill, []*SkillState) {
 			return c
 		}
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-	})
+	}) /*对skill列表按路径和名称排序*/
 
 	return skills, states
 }
@@ -404,5 +421,6 @@ func Filter(all []*Skill, disabled []string) []*Skill {
 			result = append(result, s)
 		}
 	}
+	/*返回未禁用的skill列表*/
 	return result
 }

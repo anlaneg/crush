@@ -79,6 +79,7 @@ type QuestionChoice struct {
 	Description string `json:"description,omitempty" description:"Optional description for this choice"`
 }
 
+/*question 工具让 LLM 反过来向用户提问、等用户在 TUI 里选/答，然后把用户的回复作为 tool result 送回给自己继续推理。*/
 // NewQuestionTool creates a new question tool.
 func NewQuestionTool(svc question.Service) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
@@ -91,6 +92,7 @@ func NewQuestionTool(svc question.Service) fantasy.AgentTool {
 				return fantasy.NewTextErrorResponse("at least one question is required"), nil
 			}
 			if len(params.Questions) > question.MaxQuestions {
+				/*超过容许的问题最大数*/
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("exceeds maximum of %d questions per batch (got %d). Split into multiple batches and tell the user there will be follow-up questions", question.MaxQuestions, len(params.Questions))), nil
 			}
 

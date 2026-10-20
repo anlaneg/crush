@@ -32,11 +32,13 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 	var discovered []*Skill
 	var states []*SkillState
 
+	/*遍历builtin目录，发现所有技能文件*/
 	fs.WalkDir(builtinFS, "builtin", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() || d.Name() != SkillFileName {
+			/*跳过非SKILL.md文件*/
 			return nil
 		}
 
@@ -47,6 +49,7 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 			return nil
 		}
 
+		/*解析skill.md文件内容*/
 		skill, err := ParseContent(content)
 		if err != nil {
 			slog.Warn("Failed to parse builtin skill file", "path", path, "error", err)
@@ -61,9 +64,11 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 		relPath = filepath.ToSlash(relPath)
 		skill.SkillFilePath = BuiltinPrefix + relPath
 		skill.Path = BuiltinPrefix + filepath.Dir(relPath)
+		/*指明为内置skill*/
 		skill.Builtin = true
 
 		if err := skill.Validate(); err != nil {
+			/*skill验证失败*/
 			slog.Warn("Builtin skill validation failed", "path", path, "error", err)
 			states = append(states, &SkillState{Name: skill.Name, Path: path, State: StateError, Err: err})
 			return nil
@@ -75,5 +80,5 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 		return nil
 	})
 
-	return discovered, states
+	return discovered/*加载成功的skill列表*/, states/*每个skill的发现状态*/
 }

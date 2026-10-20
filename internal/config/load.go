@@ -208,22 +208,28 @@ func PushPopCrushEnv() func() {
 	var found []string
 	for _, ev := range os.Environ() {
 		if strings.HasPrefix(ev, "CRUSH_") {
+			/*只考虑前缀为CRUSH_的环境变量*/
 			pair := strings.SplitN(ev, "=", 2)
 			if len(pair) != 2 {
 				continue
 			}
+			/*移除CRUSH_前缀,只保留环境变量名后缀*/
 			found = append(found, strings.TrimPrefix(pair[0], "CRUSH_"))
 		}
 	}
+
+	/*后面的处理会覆盖这些环境变量的内容，先备份*/
 	backups := make(map[string]string)
 	for _, ev := range found {
 		backups[ev] = os.Getenv(ev)
 	}
 
+	/*设置无“CRUSH_”前缀的环境变量值为有“CRUSH_”前缀的环境变量值*/
 	for _, ev := range found {
 		os.Setenv(ev, os.Getenv("CRUSH_"+ev))
 	}
 
+	/*恢复用函数*/
 	restore := func() {
 		for k, v := range backups {
 			os.Setenv(k, v)
@@ -534,6 +540,7 @@ func (c *Config) setDefaults(workingDir, dataDir string) {
 	if dataDir != "" {
 		c.Options.DataDirectory = dataDir
 	} else if c.Options.DataDirectory == "" {
+		/*未指定，设置默认data dir*/
 		if path, ok := fsext.LookupClosestBounded(workingDir, projectBoundary(workingDir), defaultDataDirectory); ok {
 			c.Options.DataDirectory = path
 		} else {
@@ -925,8 +932,11 @@ func lookupConfigs(cwd string) []string {
 	return append(configPaths, foundConfigs...)
 }
 
+/*加载configPaths中的配置（json格式），合并为一个json后，再解释成Config结构体*/
 func loadFromConfigPaths(ctx context.Context, configPaths []string) (*Config, []string, error) {
+	/*读取到的加载配置数据*/
 	var configs [][]byte
+	/*已加载的配置文件路径*/
 	var loaded []string
 
 	// Track directories that have both crush.json and crushrc to warn
@@ -947,6 +957,7 @@ func loadFromConfigPaths(ctx context.Context, configPaths []string) (*Config, []
 			return nil, nil, fmt.Errorf("failed to open config file %s: %w", path, err)
 		}
 		if len(data) == 0 {
+			/*跳过空文件*/
 			continue
 		}
 
@@ -1021,10 +1032,12 @@ func loadFromBytes(configs [][]byte) (*Config, error) {
 		return &Config{}, nil
 	}
 
+	/*合并所有配置（后面的会覆盖前面的，数组默认会合并）*/
 	data, err := jsons.Merge(configs)
 	if err != nil {
 		return nil, err
 	}
+	/*解析合并后的配置数据*/
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
@@ -1222,6 +1235,7 @@ func GlobalConfigData() string {
 		return filepath.Join(localAppData, appName, fmt.Sprintf("%s.json", appName))
 	}
 
+	/*其它系统放在$HOME/.local/share/crush/下,比如：~/.local/share/crush/crush.json*/
 	return filepath.Join(home.Dir(), ".local", "share", appName, fmt.Sprintf("%s.json", appName))
 }
 
